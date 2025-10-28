@@ -1,4 +1,4 @@
-import { FFmpeg } from '@ffmpeg/ffmpeg';
+import { FFmpeg, LogEvent } from '@ffmpeg/ffmpeg';
 import { fetchFile, toBlobURL } from '@ffmpeg/util';
 
 export interface AudioChunk {
@@ -28,7 +28,7 @@ export class AudioExtractor {
         this.loaded = true
     }
 
-    async extractAudio(videoFile: File): Promise<Blob | undefined> {
+    async extractAudio(videoFile: File) {
         if (!this.ffmpeg || !this.loaded) {
             throw new Error('FFmpeg not initialized. Call initialize() first.');
         }
@@ -45,12 +45,62 @@ export class AudioExtractor {
                 'output.wav'
             ]);
 
-            const data = await this.ffmpeg.readFile('output.wav');
-            await this.ffmpeg.deleteFile('input.mp4');
-            await this.ffmpeg.deleteFile('output.wav');
-            if (data) return new Blob([data], { type: "audio/mpeg" });
         } catch (error) {
             console.log(error)
+        }
+    }
+
+    async getAudioDuration(fileName: string): Promise<number> {
+        if (!this.ffmpeg || !this.loaded) {
+            throw new Error('FFmpeg not initialized. Call initialize() first.');
+        }
+        let duration = 0;
+
+        return new Promise(async (resolve) => {
+            const onLog = ({ message }: LogEvent) => {
+                const match = message.match(/Duration:\s(\d+):(\d+):([\d.]+)/);
+                if (match) {
+                    const [, h, m, s] = match;
+                    duration = parseFloat(h) * 3600 + parseFloat(m) * 60 + parseFloat(s);
+                }
+            };
+
+            this.ffmpeg?.on('log', onLog);
+
+            await this.ffmpeg?.exec(['-i', fileName, '-f', 'null', '-']);
+
+            this.ffmpeg?.off('log', onLog);
+            resolve(duration || 300);
+        });
+    }
+
+    async chunkAudioFromAssembly(fileName: string, chunkSeconds = 0.1) {
+        if (!this.ffmpeg || !this.loaded) {
+            throw new Error('FFmpeg not initialized. Call initialize() first.');
+        }
+
+        const duration = await this.getAudioDuration(fileName);
+        const chunks = [];
+        let start = 0;
+        let index = 0;
+
+        while (start < duration) {
+            const output = `chunk_${index}.wav`;
+
+            await this.ffmpeg.exec([
+                '-i', fileName,
+                '-ss', `${start}`,
+                '-t', `${chunkSeconds}`,
+                '-acodec', 'copy',
+                output
+            ]);
+
+            const data = await this.ffmpeg.readFile(output);
+            const blob = new Blob([data.buffer], { type: 'audio/mpeg' });
+            chunks.push(blob);
+
+            start += chunkSeconds;
+            index++;
         }
     }
 }
