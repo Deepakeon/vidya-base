@@ -7,7 +7,7 @@ export interface LLMInput {
   /**
    * Optional audio input — can be a Blob or a URL string.
    */
-  audio?: string | Blob;
+  audio?: (string | Blob)[];
 }
 
 /**

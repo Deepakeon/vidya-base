@@ -35,16 +35,18 @@ export class AudioExtractor {
 
         try {
             await this.ffmpeg.writeFile('input.mp4', await fetchFile(videoFile));
-
+            const outputName = 'output.wav'
+            // atempo=1.5,
             await this.ffmpeg.exec([
                 '-i', 'input.mp4',
                 '-vn',
+                '-filter:a', 'silenceremove=start_periods=1:start_threshold=-40dB:start_silence=1:stop_periods=-1:stop_threshold=-40dB:stop_silence=1',
                 '-acodec', 'pcm_s16le', // Raw uncompressed PCM
                 '-ar', '44100',
                 '-ac', '2',
-                'output.wav'
+                outputName
             ]);
-
+            return outputName
         } catch (error) {
             console.log(error)
         }
@@ -74,7 +76,7 @@ export class AudioExtractor {
         });
     }
 
-    async chunkAudioFromAssembly(fileName: string, chunkSeconds = 0.1) {
+    async chunkAudioFromAssembly(fileName: string, chunkSeconds = 30) {
         if (!this.ffmpeg || !this.loaded) {
             throw new Error('FFmpeg not initialized. Call initialize() first.');
         }
@@ -102,7 +104,21 @@ export class AudioExtractor {
             start += chunkSeconds;
             index++;
         }
+
+        return chunks
     }
+
+    async extractAndChunk(videoFile: File) {
+        if (!this.ffmpeg || !this.loaded) {
+            throw new Error('FFmpeg not initialized. Call initialize() first.');
+        }
+
+        const outputName = await this.extractAudio(videoFile)
+        if (outputName) {
+            return await this.chunkAudioFromAssembly(outputName)
+        }
+    }
+
 }
 
 let audioExtractorInstance: AudioExtractor | null = null;

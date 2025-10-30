@@ -1,5 +1,7 @@
 import { LLM } from "./llm";
 
+export const AUDIO_CHUNKS_PER_SESSION = 5;
+
 interface LanguageModelParams {
     defaultTopK: number;
     maxTopK: number;
@@ -10,7 +12,10 @@ interface LanguageModelSession {
     prompt(input: LanguageModelInput[], options?: Partial<LanguageModelParams>): Promise<string>;
     inputUsage: number;
     inputQuota: number;
+    clone: () => Promise<LanguageModelSession>;
+    destroy: () => void;
 }
+
 declare const LanguageModel: {
     availability(): Promise<"available" | "downloadable" | "unavailable">;
     params(): Promise<LanguageModelParams>;
@@ -18,6 +23,7 @@ declare const LanguageModel: {
         temperature?: number;
         topK?: number;
         expectedInputs?: Array<{ type: "text" | "audio" }>;
+        initialPrompts: LanguageModelInput[];
         monitor?: (monitor: {
             addEventListener: (
                 type: "downloadprogress",
@@ -31,14 +37,17 @@ interface LanguageModelInput {
     content: Array<
         | { type: "text"; value: string }
         | { type: "audio"; value: Blob }
-    >;
+    > | string;
 }
 export class GeminiNano extends LLM {
     readonly model = "gemini-nano";
-    private session: LanguageModelSession | null = null;
-    private isAvailable = false;
-    private params: LanguageModelParams | null = null;
-    private availability: "available" | "downloadable" | "unavailable" | null = null;
+    session: LanguageModelSession | null = null;
+    sessionClones: LanguageModelSession[] = [];
+    isAvailable = false;
+    params: LanguageModelParams | null = null;
+    availability: "available" | "downloadable" | "unavailable" | null = null;
+    // tokenUsagePerSecond = 19
+    // audioChunkSizeInSeconds = 30
 
     /**
      * Checks if Gemini Nano is available and sets up the model if allowed.
@@ -58,12 +67,14 @@ export class GeminiNano extends LLM {
     /**
      * Creates a model instance. Requires user activation if model isn’t ready.
      */
-    async createSession(): Promise<void> {
+    async createSession(cloneCount = 1, initialPrompts: LanguageModelInput[] = [{
+        role: "system",
+        content: "Your only job is to transcribe all the audio inputs into text accurately and concisely. Do not add any additional commentary or information. Focus solely on converting the spoken words from the audio into written text."
+    }]): Promise<void> {
         try {
-            this.params = await LanguageModel.params();
+            this.session?.destroy();
             this.session = await LanguageModel.create({
-                temperature: Math.min(this.params.defaultTemperature * 1.2, this.params.maxTemperature),
-                topK: this.params.defaultTopK,
+                initialPrompts: initialPrompts,
                 expectedInputs: [{ type: "text" }, { type: "audio" }],
                 monitor(m) {
                     m.addEventListener("downloadprogress", (e) => {
@@ -71,6 +82,11 @@ export class GeminiNano extends LLM {
                     });
                 },
             });
+            this.sessionClones = await Promise.all(Array.from({ length: cloneCount - 1 }, (_, i) => {
+                console.log(`${i} clone created`)
+                return this.session!.clone()
+            }));
+            this.sessionClones.push(this.session)
             this.isAvailable = true;
             console.log("Gemini Nano model instance created successfully.");
         } catch (err) {
@@ -81,10 +97,11 @@ export class GeminiNano extends LLM {
 
     async generate(
         input:
-            { text?: string; audio?: string | Blob },
-        options?: Partial<LanguageModelParams>
+            { text?: string; audio?: (string | Blob)[] },
+        session = this.session,
+        options?: Partial<LanguageModelParams>,
     ): Promise<string> {
-        if (!this.isAvailable || !this.session) {
+        if (!this.isAvailable || !session) {
             throw new Error("Gemini Nano model not initialized. Call initialize() and createSession() first.");
         }
 
@@ -95,19 +112,23 @@ export class GeminiNano extends LLM {
         try {
             const content: LanguageModelInput["content"] = [];
 
-            if (input.text) {
+            if (input.text?.length) {
                 content.push({ type: "text", value: input.text });
             }
 
             if (input.audio) {
-                const audioBlob =
-                    typeof input.audio === "string"
-                        ? await (await fetch(input.audio)).blob()
-                        : input.audio;
-                content.push({ type: "audio", value: audioBlob });
+                for (const audio of input.audio) {
+                    const audioBlob =
+                        typeof audio === "string"
+                            ? await (await fetch(audio)).blob()
+                            : audio;
+                    content.push({ type: "audio", value: audioBlob });
+                }
+
             }
 
-            const result = await this.session.prompt([{ role: "user", content }], options);
+            const result = await session.prompt([{ role: "user", content }], options);
+            console.log(this.getSessionQuota())
             return result ?? "No response from Gemini Nano.";
         } catch (err) {
             console.error("Gemini Nano generation error:", err);
@@ -115,10 +136,28 @@ export class GeminiNano extends LLM {
         }
     }
 
-    getSessionQuota(): { used: number; total: number } {
-    return {
-      used: this.session?.inputUsage ?? 0,
-      total: this.session?.inputQuota ?? 0,
-    };
-  }
+    async runPromptsInParallel(inputs:
+        { text?: string; audio?: (string | Blob)[] }[],
+        options?: Partial<LanguageModelParams>) {
+        return await Promise.all(inputs.map((input, index) => {
+            return this.generate(input, this.sessionClones[index] || this.session!, options)
+        }))
+    }
+
+    getSessionQuota(): { used: number; total: number, remaining: number } {
+        const used = this.session?.inputUsage ?? 0, total = this.session?.inputQuota ?? 0;
+        return {
+            used,
+            total,
+            remaining: total - used
+        };
+    }
+
+    // getRemainingChunkQuota() {
+    //     const { remaining } = this.getSessionQuota()
+    //     const remainingSpeechSeconds = remaining / (this.tokenUsagePerSecond)
+    //     const remainingChunks = Math.floor(remainingSpeechSeconds / this.audioChunkSizeInSeconds)
+
+    //     return remainingChunks
+    // }
 }
