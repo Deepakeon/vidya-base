@@ -13,7 +13,7 @@ Then, write a **concise, factual summary** in Markdown format.
 
 ### Output Format Example
 
-## Chunk Summary {CHUNK_NUMBER}
+## Chunk Summary
 
 **Main Ideas**
 - Idea 1  

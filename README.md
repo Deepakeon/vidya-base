@@ -1,36 +1,58 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# 🧠 VidyaBase  
+*Generate a structured knowledge base from any video.*
 
-## Getting Started
+---
 
-First, run the development server:
+## 📽️ Overview  
+**VidyaBase** automatically converts videos into clean, summarized knowledge.  
+Upload an `.mp4` file and watch as it:  
+1. Extracts audio from the video.  
+2. Splits audio into 30-second chunks.  
+3. Transcribes and summarizes each chunk in parallel.  
+4. Builds a searchable **knowledge base** from the summaries.  
+
+## ✨ Features  
+- 🎥 Upload `.mp4` videos directly  
+- 🔊 Automatic audio extraction and splitting  
+- ⚙️ Parallel transcription and summarization  
+- 📚 Generates a clean, structured knowledge base  
+- 💬 Markdown rendering for summaries  
+- ⚡ Real-time loading and progress animations  
+- 🧠 Factual, concise summaries powered by LLMs  
+
+---
+
+## 🧰 Tech Stack  
+| Category | Tools |
+|-----------|--------|
+| **Frontend** | React / Next.js |
+| **Audio Processing** | FFmpeg (via @ffmpeg/ffmpeg) |
+| **Transcription** | Gemini Prompt API |
+| **Styling & UI** | TailwindCSS |
+| **Markdown Rendering** | `react-markdown` |
+
+---
+## 🧱 Prerequisites  
+
+Before running **VidyaBase**, make sure your setup meets the following requirements:  
+
+### 🧭 Browser Requirements  
+VidyaBase relies on **on-device AI capabilities** available only in the latest versions of Chrome.  
+- Download and install the **latest Chrome (Stable Channel)** from:  
+  👉 [https://www.google.com/chrome/](https://www.google.com/chrome/)  
+
+
+## ⚙️ Installation  
 
 ```bash
+git clone https://github.com/Deepakeon/vidya-base.git
+cd vidya-base
+
+npm install
+
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
-
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
-
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
-
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## ⚖️ License
+This project is licensed under the [MIT License](./LICENSE).

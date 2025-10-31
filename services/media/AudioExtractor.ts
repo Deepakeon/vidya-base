@@ -98,7 +98,12 @@ export class AudioExtractor {
             ]);
 
             const data = await this.ffmpeg.readFile(output);
-            const blob = new Blob([data.buffer], { type: 'audio/mpeg' });
+            let blob: Blob;
+            if (data instanceof Uint8Array) {
+                blob = new Blob([data.buffer as BlobPart], { type: 'audio/wav' });
+            } else {
+                blob = new Blob([new TextEncoder().encode(data)], { type: 'audio/wav' });
+            }
             chunks.push(blob);
 
             start += chunkSeconds;
@@ -119,13 +124,4 @@ export class AudioExtractor {
         }
     }
 
-}
-
-let audioExtractorInstance: AudioExtractor | null = null;
-
-export function getAudioExtractor(): AudioExtractor {
-    if (!audioExtractorInstance) {
-        audioExtractorInstance = new AudioExtractor();
-    }
-    return audioExtractorInstance;
 }

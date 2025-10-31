@@ -1,6 +1,7 @@
 import { LLM } from "./llm";
 import { PROMPT_CHUNK_SUMMARY } from "./prompt";
 
+// Gemini prompt API, only allows 5 audio blobs of 30 seconds each per session
 export const AUDIO_CHUNKS_PER_SESSION = 5;
 
 interface LanguageModelParams {
@@ -47,22 +48,16 @@ export class GeminiNano extends LLM {
     isAvailable = false;
     params: LanguageModelParams | null = null;
     availability: "available" | "downloadable" | "unavailable" | null = null;
-    // tokenUsagePerSecond = 19
-    // audioChunkSizeInSeconds = 30
 
     /**
      * Checks if Gemini Nano is available and sets up the model if allowed.
      * Should be called during a user gesture (click, tap, etc.) if model is not yet ready.
      */
-    async initialize(): Promise<void> {
+    async checkAvailability(): Promise<{ available: boolean, needsDownload: boolean }> {
         this.availability = await LanguageModel.availability();
         console.log("Gemini Nano availability:", this.availability);
-
-        if (this.availability === "unavailable") {
-            console.warn("Gemini Nano model unavailable on this device.");
-            this.isAvailable = false;
-            return;
-        }
+        this.isAvailable = this.availability !== "unavailable"
+        return { available: this.isAvailable, needsDownload: this.availability === "downloadable" }
     }
 
     /**
@@ -129,7 +124,7 @@ export class GeminiNano extends LLM {
             }
 
             const result = await session.prompt([{ role: "user", content }], options);
-            console.log(this.getSessionQuota(), result)
+            console.log(this.getSessionQuota())
             return result ?? "No response from Gemini Nano.";
         } catch (err) {
             console.error("Gemini Nano generation error:", err);
@@ -139,10 +134,23 @@ export class GeminiNano extends LLM {
 
     async runPromptsInParallel(inputs:
         { text?: string; audio?: (string | Blob)[] }[],
-        options?: Partial<LanguageModelParams>) {
-        return Promise.all(inputs.map((input, index) => {
-            return this.generate(input, this.sessionClones[index] || this.session!, options)
-        }))
+        options?: Partial<LanguageModelParams>,
+        onProgress?: (completed: number) => void
+    ) {
+        let completed = 0;
+
+        const promises = inputs.map(async (input, index) => {
+            const result = await this.generate(
+                input,
+                this.sessionClones[index] || this.session!,
+                options
+            );
+            completed+=input?.audio?.length ?? 0;
+            onProgress?.(completed);
+            return result;
+        });
+
+        return Promise.all(promises);
     }
 
     getSessionQuota(): { used: number; total: number, remaining: number } {
