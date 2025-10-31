@@ -1,4 +1,5 @@
 import { LLM } from "./llm";
+import { PROMPT_CHUNK_SUMMARY } from "./prompt";
 
 export const AUDIO_CHUNKS_PER_SESSION = 5;
 
@@ -69,7 +70,7 @@ export class GeminiNano extends LLM {
      */
     async createSession(cloneCount = 1, initialPrompts: LanguageModelInput[] = [{
         role: "system",
-        content: "Your only job is to transcribe all the audio inputs into text accurately and concisely. Do not add any additional commentary or information. Focus solely on converting the spoken words from the audio into written text."
+        content: PROMPT_CHUNK_SUMMARY
     }]): Promise<void> {
         try {
             this.session?.destroy();
@@ -82,7 +83,7 @@ export class GeminiNano extends LLM {
                     });
                 },
             });
-            this.sessionClones = await Promise.all(Array.from({ length: cloneCount - 1 }, (_, i) => {
+            this.sessionClones = await Promise.all(Array.from({ length: cloneCount }, (_, i) => {
                 console.log(`${i} clone created`)
                 return this.session!.clone()
             }));
@@ -128,7 +129,7 @@ export class GeminiNano extends LLM {
             }
 
             const result = await session.prompt([{ role: "user", content }], options);
-            console.log(this.getSessionQuota())
+            console.log(this.getSessionQuota(), result)
             return result ?? "No response from Gemini Nano.";
         } catch (err) {
             console.error("Gemini Nano generation error:", err);
@@ -139,7 +140,7 @@ export class GeminiNano extends LLM {
     async runPromptsInParallel(inputs:
         { text?: string; audio?: (string | Blob)[] }[],
         options?: Partial<LanguageModelParams>) {
-        return await Promise.all(inputs.map((input, index) => {
+        return Promise.all(inputs.map((input, index) => {
             return this.generate(input, this.sessionClones[index] || this.session!, options)
         }))
     }
