@@ -7,7 +7,7 @@ import { AUDIO_CHUNKS_PER_SESSION, GeminiNano } from '@/services/llm/GeminiNano'
 import { ProcessingAnimation } from '@/components/ProcessingAnimation';
 import { AudioExtractor } from '@/services/media/AudioExtractor';
 import { KnowledgeBase } from '@/components/KnowledgeBase';
-import { PROMPT_KB_SYNTHESIS } from '@/services/llm/prompt';
+import { PROMPT_CHUNK_SUMMARY, PROMPT_KB_SYNTHESIS } from '@/services/llm/prompt';
 
 function App() {
   const gemini = new GeminiNano()
@@ -39,17 +39,10 @@ function App() {
         message: 'Checking AI model availability...',
       });
 
-      const { available, needsDownload } = await gemini.checkAvailability();
+      const { available } = await gemini.checkAvailability();
 
       if (!available) {
         throw new Error('Gemini Nano is not available in this browser');
-      }
-
-      if (needsDownload) {
-        setProgress({
-          stage: 'model-download',
-          message: 'Downloading AI model (this may take a few minutes on first use, check console for download progress)...',
-        });
       }
 
       setProgress({
@@ -68,7 +61,15 @@ function App() {
       });
 
       const processedChunks: ProcessedChunk[] = [];
-      await gemini.createSession(Math.ceil((audioChunks?.length ?? 0) / AUDIO_CHUNKS_PER_SESSION))
+      await gemini.createSession(Math.ceil((audioChunks?.length ?? 0) / AUDIO_CHUNKS_PER_SESSION), [{
+        role: "system",
+        content: PROMPT_CHUNK_SUMMARY
+    }],(progress) => {
+        setProgress({
+          stage: 'model-download',
+          message: `Downloading AI model... (${progress}%)`,
+        });
+      });
       const payload = []
       for (let i = 0; i < (audioChunks?.length ?? 0); i += AUDIO_CHUNKS_PER_SESSION) {
         payload.push({

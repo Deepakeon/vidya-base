@@ -66,7 +66,7 @@ export class GeminiNano extends LLM {
     async createSession(cloneCount = 1, initialPrompts: LanguageModelInput[] = [{
         role: "system",
         content: PROMPT_CHUNK_SUMMARY
-    }]): Promise<void> {
+    }], onDownloadProgress?: (progress: number) => void): Promise<void> {
         try {
             this.session?.destroy();
             this.session = await LanguageModel.create({
@@ -75,6 +75,7 @@ export class GeminiNano extends LLM {
                 monitor(m) {
                     m.addEventListener("downloadprogress", (e) => {
                         console.log(`Downloaded ${(e.loaded * 100).toFixed(1)}%`);
+                        onDownloadProgress?.((e.loaded * 100))
                     });
                 },
             });
