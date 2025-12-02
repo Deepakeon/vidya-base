@@ -53,6 +53,13 @@ npm install
 npm run dev
 
 ```
+## 🏆 Hackathon Submission
+
+This repository was created as a submission for **Google Chrome Built-in AI Challenge 2025**. 
+
+- **Challenge:** Develop a new web application or Chrome Extension that uses one or more APIs to interact with Chrome’s built-in AI models, such as Gemini Nano
+- **Timeline:** Built in 5 days.
+- **Submission:** https://devpost.com/software/vidya-base?ref_content=user-portfolio&ref_feature=in_progress
 
 ## ⚖️ License
 This project is licensed under the [MIT License](./LICENSE).
